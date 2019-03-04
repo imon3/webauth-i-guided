@@ -49,21 +49,52 @@ server.post('/api/login', (req, res) => {
     });
 });
 
-server.get('/api/users', async (req, res) => {
-  let { username, password } = req.body
-  try {
-    const user = await Users.findBy({ username }).first()
-    if (user && bcryptjs.compareSync(password, user.password)) {
-      const users = await Users.find()
-      res.json(users)
-    } else {
-      res.status(401).json({ message: "invalid credentials" })
-    }
-  } catch (error) {
-    console.log(error)
-    res.status(500).json(error)
+function restricted(req, res, next) {
+  let { username, password } = req.headers;
+
+  if (username && password) {
+    Users.findBy({ username })
+      .first()
+      .then(user => {
+        if (user && bcryptjs.compareSync(password, user.password)) {
+          next()
+        } else {
+          res.status(401).json({ message: 'Invalid Credentials' });
+        }
+      })
+      .catch(error => {
+        res.status(500).json({ message: 'Ran into an error.' });
+      });
+  } else {
+    res.status(400).json({ message: 'No creditials provided.' });
   }
-});
+
+
+}
+
+server.get('/api/users', restricted, (req, res) => {
+  Users.find()
+    .then(users => {
+      res.json(users);
+    })
+    .catch(err => res.send(err));
+})
+
+// server.get('/api/users', async (req, res) => {
+//   let { username, password } = req.body
+//   try {
+//     const user = await Users.findBy({ username }).first()
+//     if (user && bcryptjs.compareSync(password, user.password)) {
+//       const users = await Users.find()
+//       res.json(users)
+//     } else {
+//       res.status(401).json({ message: "invalid credentials" })
+//     }
+//   } catch (error) {
+//     console.log(error)
+//     res.status(500).json(error)
+//   }
+// });
 
 // server.get('/api/users', (req, res) => {
 
