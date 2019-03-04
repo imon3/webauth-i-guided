@@ -1,6 +1,7 @@
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const bcryptjs = require('bcryptjs');
 
 const db = require('./database/dbConfig.js');
 const Users = require('./users/users-model.js');
@@ -18,6 +19,10 @@ server.get('/', (req, res) => {
 server.post('/api/register', (req, res) => {
   let user = req.body;
 
+  const hash = bcryptjs.hashSync(user.password, 16);
+
+  user.password = hash;
+
   Users.add(user)
     .then(saved => {
       res.status(201).json(saved);
@@ -33,7 +38,7 @@ server.post('/api/login', (req, res) => {
   Users.findBy({ username })
     .first()
     .then(user => {
-      if (user) {
+      if (user && bcryptjs.compareSync(password, user.password)) {
         res.status(200).json({ message: `Welcome ${user.username}!` });
       } else {
         res.status(401).json({ message: 'Invalid Credentials' });
@@ -44,13 +49,32 @@ server.post('/api/login', (req, res) => {
     });
 });
 
-server.get('/api/users', (req, res) => {
-  Users.find()
-    .then(users => {
-      res.json(users);
-    })
-    .catch(err => res.send(err));
+server.get('/api/users', async (req, res) => {
+  let { username, password } = req.body
+  try {
+    const user = await Users.findBy({ username }).first()
+    if (user && bcryptjs.compareSync(password, user.password)) {
+      const users = await Users.find()
+      res.json(users)
+    } else {
+      res.status(401).json({ message: "invalid credentials" })
+    }
+  } catch (error) {
+    console.log(error)
+    res.status(500).json(error)
+  }
 });
+
+// server.get('/api/users', (req, res) => {
+
+//   Users.find()
+//     .then(users => {
+//       console.log(users)
+
+//       res.json(users);
+//     })
+//     .catch(err => res.send(err));
+// });
 
 const port = process.env.PORT || 5000;
 server.listen(port, () => console.log(`\n** Running on port ${port} **\n`));
